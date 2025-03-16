@@ -58,8 +58,7 @@ class MarkovRewardProcess:
             curState = np.random.choice(pos_successors, p=probs)
             traj.append(self.states[curState])
             rew.append(self.rewards[curState])
-        Return = self.calc_return(rew)
-        return traj, Return
+        return traj, self.calc_return(rew)
 
     def calc_return(self, rewards):
         """
