@@ -1,8 +1,8 @@
 import numpy as np
 
-class MarkovChain:
+class MarkovRewardProcess:
 
-    def __init__(self, states: list, terminalStates: list, transProbs: dict):
+    def __init__(self, states, rewards, transProbs, terminalStates, gamma, **kwargs):
         """
         Class represents a markov chain
 
@@ -16,8 +16,10 @@ class MarkovChain:
             state 0 to state 1
         """
         self.states = states
+        self.rewards = rewards
         self.terminalStates = terminalStates
         self.transProbs = transProbs
+        self.gamma = gamma
 
         self.trans_prob_matrix = np.zeros((len(states), len(states)))
 
@@ -27,6 +29,7 @@ class MarkovChain:
 
         for ts in terminalStates:
             self.trans_prob_matrix[ts, ts] = 1.0
+
 
     def getNextState(self, state: int) -> list:
         """
@@ -43,23 +46,35 @@ class MarkovChain:
         the trajectory.
 
         :param startstate: state to start sampling from the episode
-        :return: list of names of states running through in an episode
+        :return: list of names of states running through in an episode and calculated return
         """
-        traj = []
+        traj, rew = [], []
         curState = startstate
         traj.append(self.states[curState])
+        rew.append(self.rewards[curState])
         while curState not in self.terminalStates:
             pos_successors = self.getNextState(curState)
             probs = list(self.transProbs[curState][succ] for succ in pos_successors)
             curState = np.random.choice(pos_successors, p=probs)
             traj.append(self.states[curState])
-        return traj
+            rew.append(self.rewards[curState])
+        Return = self.calc_return(rew)
+        return traj, Return
 
-    def paging(self, startvec: np.ndarray, maxTimesteps: int):
+    def calc_return(self, rewards):
         """
-        Calculates the probabilites of being in a certain state after maxTimesteps
+        Calculates the return of the given rewards after an episode
 
-        :param startvec: vector of starting state
-        :return:    vector with probabilities
+        :param rewards: list of rewards gathered during an episode
+        :return: calculated return
         """
         pass
+
+    def analytical_sol(self):
+        """
+        calculates the analytical solution of the value function according to the lecture slides
+
+        :return: a list of values for each state
+        """
+        pass
+
