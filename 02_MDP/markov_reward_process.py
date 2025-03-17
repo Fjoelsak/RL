@@ -4,16 +4,20 @@ class MarkovRewardProcess:
 
     def __init__(self, states, rewards, transProbs, terminalStates, gamma, **kwargs):
         """
-        Class represents a markov chain
+        Class represents a markov reward process
 
         :param states: List
             list of states
-        :param terminalStates: List
-            list of terminal states
-        :param probs: Dictionary
+        :param rewards: List
+            list of rewards for each state
+        :param transProbs: Dictionary
             probabilities of each state to the following state in the form
             {0: {0: 0.1, 1: 0.8, 2: 0.1}, 1: {0: 0.3}}, that is, you arrive with 10% from
             state 0 to state 1
+        :param terminalStates: List
+            list of terminal states
+        :param gamma: float
+            discount factor
         """
         self.states = states
         self.rewards = rewards
@@ -31,7 +35,7 @@ class MarkovRewardProcess:
             self.trans_prob_matrix[ts, ts] = 1.0
 
 
-    def getNextState(self, state: int) -> list:
+    def getPossibleNextStates(self, state: int) -> list:
         """
         Provides a list of possible successor states
 
@@ -53,7 +57,7 @@ class MarkovRewardProcess:
         traj.append(self.states[curState])
         rew.append(self.rewards[curState])
         while curState not in self.terminalStates:
-            pos_successors = self.getNextState(curState)
+            pos_successors = self.getPossibleNextStates(curState)
             probs = list(self.transProbs[curState][succ] for succ in pos_successors)
             curState = np.random.choice(pos_successors, p=probs)
             traj.append(self.states[curState])

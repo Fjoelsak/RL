@@ -2,22 +2,22 @@ import numpy as np
 
 class MarkovChain:
 
-    def __init__(self, states: list, terminalStates: list, transProbs: dict):
+    def __init__(self, states: list, transProbs: dict, terminalStates: list):
         """
         Class represents a markov chain
 
         :param states: List
             list of states
-        :param terminalStates: List
-            list of terminal states
-        :param probs: Dictionary
+        :param transProbs: Dictionary
             probabilities of each state to the following state in the form
             {0: {0: 0.1, 1: 0.8, 2: 0.1}, 1: {0: 0.3}}, that is, you arrive with 10% from
             state 0 to state 1
+        :param terminalStates: List
+            list of terminal states
         """
         self.states = states
-        self.terminalStates = terminalStates
         self.transProbs = transProbs
+        self.terminalStates = terminalStates
 
         self.trans_prob_matrix = np.zeros((len(states), len(states)))
 
