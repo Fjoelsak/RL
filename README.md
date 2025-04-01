@@ -15,3 +15,4 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 
 ## 03-Dynamic Programming
 - 30-knapsack_problem.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/30-knapsack_problem.ipynb)
+- 31-frozen_lake.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/31-frozen_lake.ipynb)
