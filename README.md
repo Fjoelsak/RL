@@ -11,3 +11,7 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 20-MarkovChain_PageRankAlgo.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/02_MDP/20-MarkovChain_PageRankAlgo.ipynb)
 - 21-MarkovRewardProcess.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/02_MDP/21-MarkovRewardProcess.ipynb)
 - 22-MarkovDecisionProcess.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/02_MDP/22-MarkovDecisionProcess.ipynb)
+
+
+## 03-Dynamic Programming
+- 30-knapsack_problem.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/30-knapsack_problem.ipynb)
