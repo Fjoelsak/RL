@@ -74,6 +74,20 @@ class mdpControl:
         ### TODO: your code here ###
         pass
 
+    def value_iteration(self):
+        """
+        Performs value iteration to find the optimal value function and policy.
+
+        Returns:
+        -------
+        policy : np.array of shape [nS, nA]
+            The optimal policy derived from the value function.
+        V : np.array of shape [nS]
+            The optimal value function.
+        """
+        V = np.zeros(self.nS)
+        pass
+
     def render_single(self, policy, max_steps=100):
         """
           This function does not need to be modified
