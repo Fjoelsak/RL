@@ -8,12 +8,12 @@ class MarkovChain:
 
         :param states: List
             list of states
+        :param terminalStates: List
+            list of terminal states
         :param transProbs: Dictionary
             probabilities of each state to the following state in the form
             {0: {0: 0.1, 1: 0.8, 2: 0.1}, 1: {0: 0.3}}, that is, you arrive with 10% from
             state 0 to state 1
-        :param terminalStates: List
-            list of terminal states
         """
         self.states = states
         self.transProbs = transProbs
