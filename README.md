@@ -18,4 +18,4 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 31-frozen_lake.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/31-frozen_lake.ipynb)
 
 ## 04-Model-free prediction
-- 40-Blackjack-Eval.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/30-Blackjack-Eval.ipynb)
+- 40-Blackjack-Eval.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/30-Blackjack_Eval.ipynb)
