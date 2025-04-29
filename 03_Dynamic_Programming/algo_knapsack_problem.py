@@ -32,3 +32,18 @@ class KnapsackProblem:
             int: The maximum total value that can be accommodated in the knapsack.
         """
         pass
+
+    def find_selected_items(self):
+        """
+        Reconstructs and returns the list of item indices selected in the optimal solution
+        to the 0-1 Knapsack problem using the dynamic programming table.
+
+        This function traces back through the dynamic programming (DP) table to identify
+        which items were included in the knapsack to achieve the maximum total value.
+
+        Returns:
+            list[int]: A list of indices (0-based) of the selected items that make up the
+                       optimal solution. The indices correspond to positions in the original
+                       weights and values lists.
+        """
+        pass
