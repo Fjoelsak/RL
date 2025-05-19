@@ -12,10 +12,14 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 21-MarkovRewardProcess.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/02_MDP/21-MarkovRewardProcess.ipynb)
 - 22-MarkovDecisionProcess.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/02_MDP/22-MarkovDecisionProcess.ipynb)
 
-
 ## 03-Dynamic Programming
 - 30-knapsack_problem.ipynb  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/30-knapsack_problem.ipynb)
 - 31-frozen_lake.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/03_Dynamic_Programming/31-frozen_lake.ipynb)
 
 ## 04-Model-free prediction
-- 40-Blackjack-Eval.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/30-Blackjack_Eval.ipynb)
+- 40-Blackjack-Eval.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/40-Blackjack_Eval.ipynb)
+
+## 05-Model-free control
+- 50-Blackjack-MC-Control.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/50-Blackjack_MC_Control.ipynb)
+- 51-Windy-Gridworld.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/51-Windy-Gridworld.ipynb)
+- 52-Cliff-Walking.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/52-Cliff-Walking.ipynb)
