@@ -1,4 +1,6 @@
 gymnasium~=1.1.1
 matplotlib~=3.10.1
-numpy~=2.2.2
+numpy~=1.26.4
 pygame~=2.6.1
+seaborn~=0.13.2
+tensorflow~=2.15.0
