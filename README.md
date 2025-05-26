@@ -23,3 +23,7 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 50-Blackjack-MC-Control.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/50-Blackjack_MC_Control.ipynb)
 - 51-Windy-Gridworld.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/51-Windy-Gridworld.ipynb)
 - 52-Cliff-Walking.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/52-Cliff-Walking.ipynb)
+
+## 06-Value-function-approximation
+- 60-MountainCar-LinearSarsa.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/06_Value_Function_Approximation/60-MountainCar-LinearSarsa.ipynb)
+- 61-CartPole-DQN.ipynb
