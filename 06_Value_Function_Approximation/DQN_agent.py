@@ -65,11 +65,11 @@ class DQNAgent:
 
     def load_model(self, name):
         ''' loads a model, that is, the weights of the DQN function approximator '''
-        self.model.load_weights(name+".h5")
+        self.model.load_weights(name+".keras")
         
     def save_model(self, name):
         ''' saves the weights of the DQN '''
-        self.model.save(name+".h5")
+        self.model.save(name+".keras")
     
     def memorize(self, state, action, reward, next_state, done):
         # Store the transition into the replay-memory
