@@ -27,6 +27,8 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 60-MountainCar-LinearSarsa.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/06_Value_Function_Approximation/60-MountainCar-LinearSarsa.ipynb)
 - 61-CartPole-DQN.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/06_Value_Function_Approximation/61-CartPole-DQN.ipynb)
 
+## 07-Policy search
+- 70-CartPole-ReinforcePGAgent.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/07_Policy_Search/70-CartPole-ReinforcePGAgent.ipynb)
 
 ## CESI International Week Workshop on RL
 - 99-Taxi-Control.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/99_International_Week_Workshop_RL/99-Taxi-Control.ipynb)
