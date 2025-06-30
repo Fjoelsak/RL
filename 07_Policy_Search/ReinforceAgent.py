@@ -81,9 +81,7 @@ class ReinforceAgent:
         - Hidden layer: Fully connected with ReLU activation (size = self.hidden_dim).
         - Output layer: Fully connected with softmax activation to represent a probability distribution over actions.
         """
-        inputs = Input(shape=(self.input_dim,))
-        x = Dense(self.hidden_dim, activation='relu')(inputs)
-        outputs = Dense(self.output_dim, activation='softmax')(x)
+        #TODO
         return Model(inputs=inputs, outputs=outputs)
 
     def get_action(self, state):
