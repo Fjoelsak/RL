@@ -45,7 +45,7 @@ class DQNAgent:
         # counter for training steps used for updating the target network from time to time (defined in config)
         self.counterDQNTrained = 0
 
-        # information being stored after each epise
+        # information being stored after each episode
         self.reward_episodes = []
         self.epsilon_over_episodes = []
         self.timesteps_per_episode = []
