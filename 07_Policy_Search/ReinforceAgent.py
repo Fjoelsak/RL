@@ -309,6 +309,33 @@ class ReinforceAgent:
 
         df.to_csv(logdir + '/' + name)
 
+    def test(self, env, name, TOTAL_EPISODES=10):
+        ''' load the weights of the DQN and perform 10 steps in the environment '''
+        # create and load weights of the model
+        self.load_model(name)
+
+        # Number of episodes in which agent manages to won the game before time is over
+        episodes_won = 0
+
+        for _ in range(TOTAL_EPISODES):
+            episode_reward = 0
+            cur_state, _ = env.reset()
+            done = False
+            episode_len = 0
+            while not done:
+                env.render()
+                episode_len += 1
+                action, log_prob = self.get_action(cur_state)
+                next_state, reward, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
+                if done and episode_len > 475:
+                    episodes_won += 1
+                cur_state = next_state
+                episode_reward += reward
+            print('EPISODE_REWARD', episode_reward)
+
+        print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
+
 def plot_trainingsinformation(data,
                               data_names,
                               colors,
