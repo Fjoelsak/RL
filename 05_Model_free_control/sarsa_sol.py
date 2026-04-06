@@ -1,5 +1,4 @@
 import gymnasium as gym
-import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -30,7 +29,7 @@ def run_episode(env, policy=None, render=True):
     return rewards
 
 def sarsa(env, num_episodes, eps0=0.5, alpha=0.5):
-    """ On-policy Sarsa algorithm (with exploration rate decay) """
+    """ On-policy Sarsa algorithm per Chapter 6.4 (with exploration rate decay) """
     assert type(env.action_space) == gym.spaces.Discrete
     assert type(env.observation_space) == gym.spaces.MultiDiscrete
 
@@ -43,7 +42,7 @@ def sarsa(env, num_episodes, eps0=0.5, alpha=0.5):
 
     # Initialize policy to equal-probable random
     policy = np.ones([n_state_ridx, n_action], dtype=float) / n_action
-    
+
     history = [0] * num_episodes
     for episode in range(num_episodes):
         # Reset the environment
@@ -60,14 +59,12 @@ def sarsa(env, num_episodes, eps0=0.5, alpha=0.5):
             next_action = np.random.choice(n_action, p=policy[next_state_ridx])
 
             # Update q values
-            """ TODO """
-            #q[state_ridx, action] += ??
-            
+            q[state_ridx, action] += alpha * (reward + q[next_state_ridx, next_action] - q[state_ridx, action])
+
             # Extract eps-greedy policy from the updated q values
-            """ TODO: update epsilon and policy based on the new q values """
-            #eps = ??
-            #policy[??, ??] = ??
-            
+            eps = eps0 / (episode + 1)
+            policy[state_ridx, :] = eps / n_action
+            policy[state_ridx, np.argmax(q[state_ridx])] = 1 - eps + eps / n_action
             assert np.allclose(np.sum(policy, axis=1), 1)
 
             # Prepare the next q update
@@ -76,22 +73,3 @@ def sarsa(env, num_episodes, eps0=0.5, alpha=0.5):
             history[episode] += 1
 
     return q, policy, history
-
-def plot_results(env, q, policy):
-    fig = plt.figure()
-    ax = fig.gca()
-    ax.set_title("Optimal Value Function and Policy")
-
-    q = np.copy(q)
-    unvisited = np.where(q == 0)
-    q[unvisited] = -np.inf
-    v = np.max(q, axis=1).reshape(env.observation_space.nvec)
-    ax.imshow(v.T, origin='lower')
-
-    a_stars = np.argmax(policy, axis=1)
-    arrows = np.array([env.unwrapped.actions[a] for a in a_stars])
-    arrows[unvisited[0], :] = 0
-    arrows = arrows.reshape([*env.observation_space.nvec, 2])
-    xr = np.arange(env.observation_space.nvec[0])
-    yr = np.arange(env.observation_space.nvec[1])
-    ax.quiver(xr, yr, arrows[:, :, 0].T, arrows[:, :, 1].T, pivot='mid')

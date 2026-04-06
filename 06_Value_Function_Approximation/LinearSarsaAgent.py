@@ -78,11 +78,11 @@ class LinearSarsaAgent:
                 env.render()
 
             if greedy:
-                # Wähle Aktion deterministisch (greedy)
+                # Select action greedily (deterministic)
                 q_values = [self.get_q(state, a) for a in range(self.n_actions)]
                 action = np.argmax(q_values)
             else:
-                # Wähle Aktion mit ε-Greedy-Strategie
+                # Select action using ε-greedy strategy
                 action = self.choose_action(state)
 
             next_state, reward, terminated, truncated, _ = env.step(action)
