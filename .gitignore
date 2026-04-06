@@ -1,0 +1,21 @@
+# Python compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+
+# Trained model files
+*.keras
+*.h5
+
+# Archives and video
+*.zip
+*.mp4
+
+# Logs and training output
+logs/
+
+# IDE
+.idea/
