@@ -19,3 +19,7 @@ logs/
 
 # IDE
 .idea/
+
+# Solution files (instructor only)
+*_sol.ipynb
+*_sol.py
