@@ -64,7 +64,7 @@ def sarsa(env, num_episodes, eps0=0.5, alpha=0.5):
             #q[state_ridx, action] += ??
             
             # Extract eps-greedy policy from the updated q values
-            """ TODO: epsilon und policy anpassen bezüglich der neuen q Werte """
+            """ TODO: update epsilon and policy based on the new q values """
             #eps = ??
             #policy[??, ??] = ??
             

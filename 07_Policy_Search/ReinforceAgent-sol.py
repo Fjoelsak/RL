@@ -1,5 +1,7 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import tensorflow as tf
 
 from collections import deque
@@ -10,12 +12,10 @@ from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
 import os
 
-from plot_utils import plot_trainingsinformation
-
 
 class ReinforceAgent:
     """
-    Class for the REINFORCE agent using TensorFlow 2.15
+    Class for the REINFORCE agent
     """
 
     def __init__(self, env, config):
@@ -81,7 +81,9 @@ class ReinforceAgent:
         - Hidden layer: Fully connected with ReLU activation (size = self.hidden_dim).
         - Output layer: Fully connected with softmax activation to represent a probability distribution over actions.
         """
-        #TODO
+        inputs = Input(shape=(self.input_dim,))
+        x = Dense(self.hidden_dim, activation='relu')(inputs)
+        outputs = Dense(self.output_dim, activation='softmax')(x)
         return Model(inputs=inputs, outputs=outputs)
 
     def get_action(self, state):
@@ -334,3 +336,69 @@ class ReinforceAgent:
 
         print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
 
+def plot_trainingsinformation(data,
+                              data_names,
+                              colors,
+                              figsize=(15, 4),
+                              ylim=3000,
+                              columns=['Rewards', 'Timesteps per episode', 'Average score over 100 episodes'],
+                              smoothing_factor=0.05,
+                              alpha_non_smooth=0.3):
+    """
+    Plots key training information for one or more agents over time.
+
+    Parameters:
+    ----------
+    data : list of pd.DataFrame
+        A list containing pandas DataFrames, each representing training metrics for a different agent.
+    data_names : list of str
+        List of labels corresponding to each DataFrame in `data`.
+    colors : list of str
+        List of colors used for plotting each agent's data.
+    figsize : tuple, optional (default=(15, 4))
+        Size of the entire plot figure.
+    ylim : int or float, optional (default=3000)
+        Upper limit for the y-axis in the rewards plot.
+    columns : list of str, optional
+        Names of the columns to be plotted from the DataFrames.
+        Should include ['Rewards', 'Average score over 100 episodes', 'Epsilon over episodes'].
+    smoothing_factor : float, optional (default=0.05)
+        Smoothing factor for the exponential weighted moving average.
+        Applied to all columns except for 'Epsilon over episodes'.
+    alpha_non_smooth : float, optional (default=0.3)
+        Transparency level for the unsmoothed lines.
+
+    Returns:
+    -------
+    None
+        Displays the plot with training metrics.
+    """
+    # Create a subplot with one row and as many columns as specified
+    fig, ax = plt.subplots(figsize=figsize, ncols=len(columns), nrows=1)
+
+    for i, col in enumerate(columns):
+        # Set full opacity for the Epsilon plot
+        alpha = alpha_non_smooth if i != 2 else 1
+
+        # Plot the original (unsmoothed) values with reduced opacity
+        for k, df in enumerate(data):
+            sns.lineplot(df, x=df.index, y=col, alpha=alpha, color=colors[k], ax=ax[i])
+
+        # Apply smoothing and plot if not the Epsilon column
+        if i != 2:
+            for k, df in enumerate(data):
+                sns.lineplot(df.ewm(alpha=smoothing_factor).mean(), x=df.index, y=col,
+                             label=data_names[k], color=colors[k], ax=ax[i])
+
+        # Adjust grid and x-axis label
+        ax[i].grid(alpha=0.3)
+        ax[i].set_xlabel('Episodes')
+
+        # Adjust legend
+        if i == 0:
+            ax[i].get_legend().remove()
+        else:
+            ax[1].legend(loc=9, bbox_to_anchor=(0.5, 1.15), ncols=len(columns))
+
+    # Set y-axis limit for the Rewards plot
+    ax[0].set_ylim(0, ylim)
