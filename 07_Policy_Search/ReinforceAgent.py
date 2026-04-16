@@ -1,49 +1,49 @@
 import pandas as pd
 import numpy as np
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.distributions import Categorical
 
 from collections import deque
 from gymnasium import Env
 
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Dense
-from tensorflow.keras.optimizers import Adam
-import os
-
 from plot_utils import plot_trainingsinformation
 
 
+class PolicyNetwork(nn.Module):
+    """Policy network outputting raw logits — softmax is handled by Categorical.
+
+    Using logits instead of an explicit Softmax layer avoids a separate
+    exp() + sum normalization step and is numerically more stable
+    (Categorical applies log_softmax internally for log_prob).
+    """
+
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 class ReinforceAgent:
-    """
-    Class for the REINFORCE agent using TensorFlow 2.15
-    """
+    """REINFORCE (Monte-Carlo policy gradient) agent for discrete action spaces."""
 
     def __init__(self, env, config):
         """
-        Initializes the REINFORCE agent with a policy network and relevant training configuration.
-
-        Parameters:
+        Parameters
         ----------
         env : gymnasium.Env
-            The environment the agent will interact with. Must have discrete action space and a flat observation space.
-
+            Discrete action space, flat observation space.
         config : dict
-            Configuration dictionary containing:
-                - 'EPISODES' (int): Number of training episodes.
-                - 'MAX_TIMESTEPS' (int): Maximum timesteps per episode.
-                - 'DISCOUNT' (float): Discount factor (gamma) for future rewards.
-                - 'LEARNING_RATE' (float): Learning rate for the policy network optimizer.
-                - 'HIDDEN_DIM' (int): Number of hidden units in the policy network.
-                - 'LOGS' (bool): Flag to enable/disable logging of training statistics.
-
-        Initializes:
-        -----------
-        - Policy network and optimizer.
-        - Episode-specific storage for states, actions, and rewards.
-        - Logging containers for performance metrics across episodes.
+            Keys: EPISODES, MAX_TIMESTEPS, DISCOUNT, LEARNING_RATE, HIDDEN_DIM, LOGS.
         """
-
-        self.max_epsiodes = config['EPISODES']
+        self.max_episodes = config['EPISODES']
         self.max_timesteps = config['MAX_TIMESTEPS']
         self.gamma = config['DISCOUNT']
         self.learning_rate = config['LEARNING_RATE']
@@ -52,168 +52,77 @@ class ReinforceAgent:
         self.output_dim = env.action_space.n
         self.logs = config['LOGS']
 
-        self.policy_net = self._build_model()
-        self.optimizer = Adam(learning_rate=self.learning_rate)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.policy_net = PolicyNetwork(self.input_dim, self.hidden_dim, self.output_dim).to(self.device)
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.learning_rate)
 
         # Storage for one episode
         self.states = []
         self.actions = []
         self.rewards = []
 
-        # information being stored after each episode
         self.reward_episodes = []
         self.timesteps_per_episode = []
         self.average_score_100_episodes = []
 
-    def _build_model(self):
-        """
-        Builds the policy network model for the REINFORCE agent.
-
-        Returns:
-        --------
-        model : keras.Model
-            A feedforward neural network with one hidden layer and softmax output,
-            representing the agent's stochastic policy.
-
-        Architecture:
-        -------------
-        - Input layer: Dimension matches the environment's observation space.
-        - Hidden layer: Fully connected with ReLU activation (size = self.hidden_dim).
-        - Output layer: Fully connected with softmax activation to represent a probability distribution over actions.
-        """
-        #TODO
-        return Model(inputs=inputs, outputs=outputs)
-
     def get_action(self, state):
-        """
-        Samples an action from the current policy given the environment state.
-
-        Parameters:
-        ----------
-        state : np.ndarray
-            The current state of the environment (shape: [input_dim]).
-
-        Returns:
-        -------
-        action : int
-            The action sampled from the policy's probability distribution.
-
-        action_prob : float
-            The probability assigned by the policy to the sampled action.
-        """
-        state = np.expand_dims(state, axis=0)  # shape: (1, input_dim)
-        action_probs = self.policy_net(state, training=False).numpy()[0]
-        action = np.random.choice(self.output_dim, p=action_probs)
-        return action, action_probs[action]
+        """Sample an action from the policy. Returns (action, probability)."""
+        state_t = torch.from_numpy(np.ascontiguousarray(state, dtype=np.float32)).unsqueeze(0).to(self.device)
+        self.policy_net.eval()
+        with torch.no_grad():
+            logits = self.policy_net(state_t).squeeze(0)
+        dist = Categorical(logits=logits)
+        action = dist.sample().item()
+        return action, dist.probs[action].item()
 
     def store_transition(self, state, action, reward):
-        """
-        Stores a single transition (state, action, reward) from the current episode.
-
-        These stored transitions will be used later to compute returns and update the policy.
-
-        Parameters:
-        ----------
-        state : np.ndarray
-            The observed state at the current timestep.
-
-        action : int
-            The action taken in the current state.
-
-        reward : float
-            The reward received after taking the action.
-        """
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
 
     def _compute_discounted_rewards(self):
-        """
-        Computes the discounted rewards for the current episode.
-
-        Applies the discount factor γ to future rewards to compute the return for each timestep,
-        and normalizes the resulting values for improved training stability.
-
-        Returns:
-        -------
-        discounted : np.ndarray
-            An array of normalized, discounted returns with the same length as the episode,
-            where each element corresponds to the return from that timestep onward.
-        """
-        discounted = np.zeros_like(self.rewards, dtype=np.float32)
+        """Compute normalized discounted returns for the stored episode."""
+        discounted = np.zeros(len(self.rewards), dtype=np.float32)
         cumulative = 0.0
         for t in reversed(range(len(self.rewards))):
             cumulative = self.rewards[t] + self.gamma * cumulative
             discounted[t] = cumulative
-        # Normalize
-        discounted = (discounted - np.mean(discounted)) / (np.std(discounted) + 1e-9)
+        discounted = (discounted - discounted.mean()) / (discounted.std() + 1e-9)
         return discounted
 
     def _update_policy(self, episode: int):
-        """
-        Updates the policy network using the REINFORCE algorithm.
-
-        Computes the policy gradient based on the collected episode data
-        and applies the gradient update to improve the policy.
-
-        Steps:
-        ------
-        1. Compute normalized, discounted rewards.
-        2. Calculate the log-probabilities of the taken actions.
-        3. Compute the REINFORCE loss: -sum(log(pi(a|s)) * G_t).
-        4. Apply gradients to update the policy network.
-        5. Clear the stored episode transitions.
-
-        Parameters:
-        ----------
-        episode : int
-            The current training episode (used for logging or tracking progress).
-        """
+        """Apply one REINFORCE gradient update and clear episode storage."""
         discounted_rewards = self._compute_discounted_rewards()
 
-        with tf.GradientTape() as tape:
-            state_tensor = tf.convert_to_tensor(np.vstack(self.states), dtype=tf.float32)
-            action_probs = self.policy_net(state_tensor, training=True)
+        states_t  = torch.from_numpy(np.array(self.states, dtype=np.float32)).to(self.device)
+        actions_t = torch.tensor(self.actions, dtype=torch.long, device=self.device)
+        returns_t = torch.from_numpy(discounted_rewards).to(self.device)
 
-            indices = np.arange(len(self.actions))
-            chosen_action_probs = tf.gather_nd(action_probs,
-                                               indices=np.vstack((indices, self.actions)).T)
+        self.policy_net.train()
+        logits = self.policy_net(states_t)
+        # Categorical(logits=...) applies log_softmax internally — numerically stable
+        dist = Categorical(logits=logits)
+        log_probs = dist.log_prob(actions_t)
+        loss = -(log_probs * returns_t).sum()
 
-            # +1e-9 avoids log(0) values causing NaNs
-            log_probs = tf.math.log(chosen_action_probs + 1e-9)
-            loss = -tf.reduce_sum(log_probs * discounted_rewards)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
-        grads = tape.gradient(loss, self.policy_net.trainable_variables)
-        self.optimizer.apply_gradients(zip(grads, self.policy_net.trainable_variables))
-
-        # Reset episode data
         self.states, self.actions, self.rewards = [], [], []
 
     def train(self, env: Env):
-        """
-        Trains the policy network using the REINFORCE algorithm over multiple episodes.
-
-        For each episode:
-        - Interacts with the environment to collect (state, action, reward) transitions.
-        - Computes the policy gradient based on the episode's trajectory.
-        - Updates the policy to maximize expected returns.
-        - Tracks training metrics like total reward, timesteps, and moving average.
-
-        Periodically saves model checkpoints and logs training progress.
-
-        Parameters:
-        ----------
-        env : gymnasium.Env
-            The environment in which the agent is trained. Must follow the Gymnasium API.
-        """
+        """Train the policy network over the configured number of episodes."""
         all_rewards = []
         max_reward = -999999
         scores_deque = deque(maxlen=100)
 
-        for episode in range(self.max_epsiodes):
+        for episode in range(self.max_episodes):
             state, _ = env.reset()
             total_reward = 0
             timestep_per_episode = 0
+            done = False
 
             for t in range(self.max_timesteps):
                 timestep_per_episode += 1
@@ -232,16 +141,15 @@ class ReinforceAgent:
             all_rewards.append(total_reward)
 
             if done:
-                if (total_reward > max_reward):
-                    self.save_model(self.logs+'/'+str(total_reward)+"_agent")
-                elif (episode % 50 == 0):
-                    self.save_model(self.logs+"/Episode_"+str(episode)+"_agent")
-                    print('Episode:\t', episode, '\t Average Score:\t',np.mean(scores_deque))
+                if total_reward > max_reward:
+                    self.save_model(self.logs + '/' + str(total_reward) + '_agent')
+                elif episode % 50 == 0:
+                    self.save_model(self.logs + '/Episode_' + str(episode) + '_agent')
+                    print('Episode:\t', episode, '\t Average Score:\t', np.mean(scores_deque))
 
             if episode % 50 == 0:
                 print(f"Episode {episode}, Reward: {total_reward:.2f}")
 
-            # bookkeeping
             scores_deque.append(total_reward)
             max_reward = max(total_reward, max_reward)
 
@@ -249,70 +157,29 @@ class ReinforceAgent:
             self.timesteps_per_episode.append(timestep_per_episode)
             self.average_score_100_episodes.append(np.mean(scores_deque))
 
-        # Save all the information during training in a pandas dataframe and save it as a csv file
         self.save_data(self.logs, 'results.csv')
 
     def save_model(self, name):
-        """
-        Saves the weights of the policy network to a file.
-
-        Parameters:
-        ----------
-        name : str
-            The base filename (without extension) to use when saving the model.
-            The final file will be saved as '<name>.keras'.
-        """
-        self.policy_net.save(name+".keras")
+        """Save policy network weights to <name>.pth."""
+        torch.save(self.policy_net.state_dict(), name + '.pth')
 
     def load_model(self, name):
-        """
-        Loads the weights of a previously saved policy network.
-
-        Parameters:
-        ----------
-        name : str
-            The base filename (without extension) from which to load the model.
-            The method expects a file named '<name>.keras'.
-        """
-        self.policy_net.load_weights(name+".keras")
+        """Load policy network weights from <name>.pth."""
+        self.policy_net.load_state_dict(torch.load(name + '.pth', map_location=self.device))
+        self.policy_net.eval()
 
     def save_data(self, logdir, name,
                   col_reward='Rewards',
                   col_timesteps='Timesteps per episode',
                   col_average_score='Average score over 100 episodes'):
-        """
-        Saves training statistics to a CSV file for later analysis.
-
-        Parameters:
-        ----------
-        logdir : str
-            Directory where the CSV file will be saved.
-
-        name : str
-            Filename of the CSV file.
-
-        col_reward : str
-            Column name for the list of total episode rewards.
-
-        col_timesteps : str
-            Column name for the list of episode lengths.
-
-        col_average_score : str
-            Column name for the moving average score over the last 100 episodes.
-        """
-
         df = pd.DataFrame({col_reward: self.reward_episodes,
                            col_timesteps: self.timesteps_per_episode,
                            col_average_score: self.average_score_100_episodes})
-
         df.to_csv(logdir + '/' + name)
 
     def test(self, env, name, TOTAL_EPISODES=10):
-        ''' load the weights of the DQN and perform 10 steps in the environment '''
-        # create and load weights of the model
+        """Load weights and run evaluation episodes."""
         self.load_model(name)
-
-        # Number of episodes in which agent manages to won the game before time is over
         episodes_won = 0
 
         for _ in range(TOTAL_EPISODES):
@@ -320,17 +187,18 @@ class ReinforceAgent:
             cur_state, _ = env.reset()
             done = False
             episode_len = 0
+
             while not done:
                 env.render()
                 episode_len += 1
-                action, log_prob = self.get_action(cur_state)
+                action, _ = self.get_action(cur_state)
                 next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 if done and episode_len > 475:
                     episodes_won += 1
                 cur_state = next_state
                 episode_reward += reward
+
             print('EPISODE_REWARD', episode_reward)
 
         print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
-

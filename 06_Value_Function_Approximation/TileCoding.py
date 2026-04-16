@@ -56,7 +56,7 @@ class TileCoder:
                 # Apply offset
                 offset = self.offsets[i][tiling] * self.tile_width[i]
                 value = state[i] + offset
-                index = int((value - self.low[i]) / self.tile_width[i])
+                index = int(np.clip((value - self.low[i]) / self.tile_width[i], 0, self.bins[i] - 1))
                 indices.append(index)
             features.append((tiling,) + tuple(indices))
         return features
