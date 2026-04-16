@@ -1,5 +1,6 @@
 
 from collections import deque
+import os
 import pandas as pd
 import numpy as np
 import random
@@ -161,6 +162,7 @@ class DQNAgent:
     def train(self, env):
         """Train the agent for the configured number of episodes."""
         logdir = self.logs
+        os.makedirs(logdir, exist_ok=True)
         max_reward = -999999
         scores_deque = deque(maxlen=100)
 

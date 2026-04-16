@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -114,6 +115,7 @@ class ReinforceAgent:
 
     def train(self, env: Env):
         """Train the policy network over the configured number of episodes."""
+        os.makedirs(self.logs, exist_ok=True)
         all_rewards = []
         max_reward = -999999
         scores_deque = deque(maxlen=100)

@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -128,6 +129,7 @@ class A2CAgent:
 
     def train(self):
         """Train the A2C agent over the configured number of episodes."""
+        os.makedirs(self.logs, exist_ok=True)
         scores_deque = deque(maxlen=100)
 
         for episode in range(self.max_episodes):
