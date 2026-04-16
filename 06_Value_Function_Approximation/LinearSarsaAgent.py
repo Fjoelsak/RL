@@ -35,7 +35,7 @@ class LinearSarsaAgent:
     def train(self, num_epsiodes):
         returns = []
         for episode in range(num_epsiodes):
-            self.epsilon = self.epsilon / (episode+1)
+            self.epsilon = max(0.01, self.epsilon * 0.995)
             state, _ = self.env.reset()
             action = self.choose_action(state)
             total_reward = 0
