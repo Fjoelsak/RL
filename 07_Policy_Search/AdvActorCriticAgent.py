@@ -21,7 +21,7 @@ class ActorNetwork(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
         )
-        self.mu_head = nn.Sequential(nn.Linear(hidden_dim, action_dim), nn.Tanh())
+        self.mu_head  = nn.Sequential(nn.Linear(hidden_dim, action_dim), nn.Tanh())
         self.std_head = nn.Sequential(nn.Linear(hidden_dim, action_dim), nn.Softplus())
 
     def forward(self, x):
@@ -51,25 +51,25 @@ class A2CAgent:
 
     def __init__(self, env, config):
         self.env = env
-        self.state_dim = env.observation_space.shape[0]
-        self.action_dim = env.action_space.shape[0]
+        self.state_dim   = env.observation_space.shape[0]
+        self.action_dim  = env.action_space.shape[0]
         self.action_bound = env.action_space.high[0]
 
-        self.gamma = config['DISCOUNT']
-        self.lr_actor = config['LEARNING_RATE']
-        self.lr_critic = config['LEARNING_RATE']
+        self.gamma      = config['DISCOUNT']
+        self.lr_actor   = config['LEARNING_RATE']
+        self.lr_critic  = config['LEARNING_RATE']
         self.hidden_dim = config['HIDDEN_DIM']
         self.batch_size = config['BATCH_SIZE']
-        self.max_episodes = config['EPISODES']
+        self.max_episodes  = config['EPISODES']
         self.max_timesteps = config['MAX_TIMESTEPS']
         self.logs = config['LOGS']
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.actor = ActorNetwork(self.state_dim, self.hidden_dim, self.action_dim).to(self.device)
+        self.actor  = ActorNetwork(self.state_dim, self.hidden_dim, self.action_dim).to(self.device)
         self.critic = CriticNetwork(self.state_dim, self.hidden_dim).to(self.device)
 
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.lr_actor)
+        self.actor_optimizer  = optim.Adam(self.actor.parameters(),  lr=self.lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr_critic)
 
         self.reward_episodes = []
@@ -77,40 +77,48 @@ class A2CAgent:
         self.average_score_100_episodes = []
 
     def _to_tensor(self, arr):
-        return torch.tensor(np.array(arr), dtype=torch.float32, device=self.device)
+        # from_numpy avoids a data copy for contiguous float32 arrays
+        return torch.from_numpy(np.ascontiguousarray(arr, dtype=np.float32)).to(self.device)
 
     def get_action(self, state):
         """Sample a clipped action from the Gaussian policy."""
         state_t = self._to_tensor(state).unsqueeze(0)
+        self.actor.eval()
         with torch.no_grad():
             mu, std = self.actor(state_t)
-        mu, std = mu.squeeze(0).cpu().numpy(), std.squeeze(0).cpu().numpy()
+        mu  = mu.squeeze(0).cpu().numpy()
+        std = std.squeeze(0).cpu().numpy()
         action = np.random.normal(mu, std)
         return np.clip(action, -self.action_bound, self.action_bound)
 
     def update_batch(self, states, actions, rewards, next_states, dones):
-        states_t = self._to_tensor(states)
+        states_t      = self._to_tensor(states)
         next_states_t = self._to_tensor(next_states)
-        actions_t = self._to_tensor(actions)
-        rewards_t = self._to_tensor(rewards)
-        dones_t = self._to_tensor(dones)
+        actions_t     = self._to_tensor(actions)
+        rewards_t     = self._to_tensor(rewards)
+        dones_t       = self._to_tensor(dones)
 
-        # Critic update
-        with torch.no_grad():
-            next_values = self.critic(next_states_t)
-            targets = rewards_t + (1 - dones_t) * self.gamma * next_values
+        n = len(states_t)
 
-        values = self.critic(states_t)
+        # Single critic forward pass over states + next_states concatenated
+        # Halves the number of matrix multiplications compared to two separate calls
+        self.critic.train()
+        all_values  = self.critic(torch.cat([states_t, next_states_t], dim=0))
+        values      = all_values[:n]
+        next_values = all_values[n:].detach()  # no gradient needed for bootstrap targets
+
+        targets   = rewards_t + (1 - dones_t) * self.gamma * next_values
         td_errors = (targets - values).detach()
-        critic_loss = nn.functional.mse_loss(values, targets)
 
+        critic_loss = nn.functional.mse_loss(values, targets)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
         # Actor update
+        self.actor.train()
         mu, std = self.actor(states_t)
-        dist = Normal(mu, std)
+        dist     = Normal(mu, std)
         log_probs = dist.log_prob(actions_t).sum(dim=-1)
         actor_loss = -(log_probs * td_errors).mean()
 
@@ -171,12 +179,12 @@ class A2CAgent:
 
     def save_model(self, name):
         """Save actor and critic weights to <name>_actor.pth and <name>_critic.pth."""
-        torch.save(self.actor.state_dict(), name + '_actor.pth')
+        torch.save(self.actor.state_dict(),  name + '_actor.pth')
         torch.save(self.critic.state_dict(), name + '_critic.pth')
 
     def load_model(self, name):
         """Load actor and critic weights from .pth files."""
-        self.actor.load_state_dict(torch.load(name + '_actor.pth', map_location=self.device))
+        self.actor.load_state_dict(torch.load(name + '_actor.pth',  map_location=self.device))
         self.critic.load_state_dict(torch.load(name + '_critic.pth', map_location=self.device))
         self.actor.eval()
         self.critic.eval()

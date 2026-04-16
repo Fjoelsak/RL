@@ -11,6 +11,44 @@ import torch.optim as optim
 from plot_utils import plot_trainingsinformation
 
 
+class ReplayBuffer:
+    """Circular buffer with pre-allocated numpy arrays.
+
+    Avoids the per-step overhead of a deque of tuples:
+    - O(1) insertion vs O(1) deque append (same), but no Python object per transition
+    - O(batch) sampling via integer indexing instead of random.sample + zip
+    - np.array() on a pre-allocated slice is zero-copy
+    """
+
+    def __init__(self, capacity, obs_dim):
+        self._cap = capacity
+        self._ptr = 0
+        self._size = 0
+        obs_shape = (capacity, *obs_dim)
+        self.states      = np.zeros(obs_shape, dtype=np.float32)
+        self.next_states = np.zeros(obs_shape, dtype=np.float32)
+        self.actions     = np.zeros(capacity, dtype=np.int64)
+        self.rewards     = np.zeros(capacity, dtype=np.float32)
+        self.dones       = np.zeros(capacity, dtype=np.float32)
+
+    def add(self, state, action, reward, next_state, done):
+        self.states[self._ptr]      = state
+        self.next_states[self._ptr] = next_state
+        self.actions[self._ptr]     = action
+        self.rewards[self._ptr]     = reward
+        self.dones[self._ptr]       = float(done)
+        self._ptr  = (self._ptr + 1) % self._cap
+        self._size = min(self._size + 1, self._cap)
+
+    def sample(self, batch_size):
+        idx = np.random.randint(0, self._size, size=batch_size)
+        return (self.states[idx], self.actions[idx], self.rewards[idx],
+                self.next_states[idx], self.dones[idx])
+
+    def __len__(self):
+        return self._size
+
+
 class DQNNetwork(nn.Module):
     """DQN: two hidden layers (24, 48, ReLU), linear output over action_dim."""
 
@@ -46,10 +84,10 @@ class DQNAgent:
         self.visualization = config['VISUALIZATION']
         self.logs = config['LOGS']
 
-        self.replay_memory = deque(maxlen=config['REPLAY_MEMORY_SIZE'])
-
         self.action_dim = env.action_space.n
         self.observation_dim = env.observation_space.shape
+
+        self.replay_memory = ReplayBuffer(config['REPLAY_MEMORY_SIZE'], self.observation_dim)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -78,29 +116,31 @@ class DQNAgent:
         torch.save(self.model.state_dict(), name + '.pth')
 
     def memorize(self, state, action, reward, next_state, done):
-        self.replay_memory.append((state, action, reward, next_state, done))
+        self.replay_memory.add(state, action, reward, next_state, done)
 
     def _to_tensor(self, arr):
-        return torch.tensor(arr, dtype=torch.float32, device=self.device)
+        # from_numpy avoids a data copy for contiguous float32 arrays
+        return torch.from_numpy(np.ascontiguousarray(arr, dtype=np.float32)).to(self.device)
 
     def trainDQN(self):
         self.counterDQNTrained += 1
 
-        batch = random.sample(self.replay_memory, self.miniBatchSize)
-        cur_states, actions, rewards, next_states, dones = zip(*batch)
+        # ReplayBuffer.sample returns pre-allocated numpy slices — no zip/list needed
+        cur_states, actions, rewards, next_states, dones = self.replay_memory.sample(self.miniBatchSize)
 
-        cur_states_t = self._to_tensor(np.array(cur_states))
-        next_states_t = self._to_tensor(np.array(next_states))
-        rewards_t = self._to_tensor(np.array(rewards))
-        dones_t = self._to_tensor(np.array(dones, dtype=np.float32))
-        actions_t = torch.tensor(actions, dtype=torch.long, device=self.device)
+        cur_states_t  = self._to_tensor(cur_states)
+        next_states_t = self._to_tensor(next_states)
+        rewards_t     = self._to_tensor(rewards)
+        dones_t       = self._to_tensor(dones)
+        actions_t     = torch.from_numpy(actions).to(self.device)
 
         # Current Q-values for taken actions
+        self.model.train()
         q_values = self.model(cur_states_t).gather(1, actions_t.unsqueeze(1)).squeeze(1)
 
         # Target Q-values from frozen target network
         with torch.no_grad():
-            next_q = self.targetmodel(next_states_t).max(1).values
+            next_q  = self.targetmodel(next_states_t).max(1).values
             targets = rewards_t + (1 - dones_t) * self.discount * next_q
 
         loss = self.loss_fn(q_values, targets)
@@ -113,6 +153,7 @@ class DQNAgent:
 
     def _predict_action(self, state):
         """Greedy action selection (no gradient tracking needed)."""
+        self.model.eval()
         with torch.no_grad():
             q = self.model(self._to_tensor(state).unsqueeze(0))
         return int(q.argmax(dim=1).item())

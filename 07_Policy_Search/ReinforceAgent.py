@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributions import Categorical
 
 from collections import deque
 from gymnasium import Env
@@ -11,7 +12,12 @@ from plot_utils import plot_trainingsinformation
 
 
 class PolicyNetwork(nn.Module):
-    """Stochastic policy: input → hidden (ReLU) → softmax over actions."""
+    """Policy network outputting raw logits — softmax is handled by Categorical.
+
+    Using logits instead of an explicit Softmax layer avoids a separate
+    exp() + sum normalization step and is numerically more stable
+    (Categorical applies log_softmax internally for log_prob).
+    """
 
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
@@ -19,7 +25,6 @@ class PolicyNetwork(nn.Module):
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, output_dim),
-            nn.Softmax(dim=-1),
         )
 
     def forward(self, x):
@@ -63,11 +68,13 @@ class ReinforceAgent:
 
     def get_action(self, state):
         """Sample an action from the policy. Returns (action, probability)."""
-        state_t = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        state_t = torch.from_numpy(np.ascontiguousarray(state, dtype=np.float32)).unsqueeze(0).to(self.device)
+        self.policy_net.eval()
         with torch.no_grad():
-            probs = self.policy_net(state_t).squeeze(0).cpu().numpy()
-        action = np.random.choice(self.output_dim, p=probs)
-        return action, probs[action]
+            logits = self.policy_net(state_t).squeeze(0)
+        dist = Categorical(logits=logits)
+        action = dist.sample().item()
+        return action, dist.probs[action].item()
 
     def store_transition(self, state, action, reward):
         self.states.append(state)
@@ -88,12 +95,15 @@ class ReinforceAgent:
         """Apply one REINFORCE gradient update and clear episode storage."""
         discounted_rewards = self._compute_discounted_rewards()
 
-        states_t = torch.tensor(np.vstack(self.states), dtype=torch.float32, device=self.device)
+        states_t  = torch.from_numpy(np.array(self.states, dtype=np.float32)).to(self.device)
         actions_t = torch.tensor(self.actions, dtype=torch.long, device=self.device)
-        returns_t = torch.tensor(discounted_rewards, dtype=torch.float32, device=self.device)
+        returns_t = torch.from_numpy(discounted_rewards).to(self.device)
 
-        probs = self.policy_net(states_t)
-        log_probs = torch.log(probs.gather(1, actions_t.unsqueeze(1)).squeeze(1) + 1e-9)
+        self.policy_net.train()
+        logits = self.policy_net(states_t)
+        # Categorical(logits=...) applies log_softmax internally — numerically stable
+        dist = Categorical(logits=logits)
+        log_probs = dist.log_prob(actions_t)
         loss = -(log_probs * returns_t).sum()
 
         self.optimizer.zero_grad()
