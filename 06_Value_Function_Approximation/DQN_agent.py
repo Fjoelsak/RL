@@ -4,19 +4,35 @@ import pandas as pd
 import numpy as np
 import random
 
-from tensorflow.keras.layers import Dense, Input
-from tensorflow.keras import Model
-from tensorflow.keras.optimizers import Adam
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 from plot_utils import plot_trainingsinformation
 
+
+class DQNNetwork(nn.Module):
+    """DQN: two hidden layers (24, 48, ReLU), linear output over action_dim."""
+
+    def __init__(self, observation_dim, action_dim):
+        super().__init__()
+        input_size = int(np.prod(observation_dim))
+        self.net = nn.Sequential(
+            nn.Linear(input_size, 24),
+            nn.ReLU(),
+            nn.Linear(24, 48),
+            nn.ReLU(),
+            nn.Linear(48, action_dim),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 class DQNAgent:
-    """
-    In this class the DQN agent is implemented
-    """
+    """DQN agent with experience replay and a separate target network."""
+
     def __init__(self, env, config):
-                
-        # used parameter within the agent
         self.episodes = config['EPISODES']
         self.epsilon = config['EPSILON']
         self.epsDecay = config['EPSILON_DECAY']
@@ -28,190 +44,170 @@ class DQNAgent:
         self.updateTQNW = config['UPDATE_TARGETNW_STEPS']
         self.learningRate = config['LEARNING_RATE']
         self.visualization = config['VISUALIZATION']
-        
         self.logs = config['LOGS']
-        # Replay memory to store experiences of the model with the environment
-        self.replay_memory = deque(maxlen = config['REPLAY_MEMORY_SIZE']) 
-    
-        # dimensions of the action and state space
+
+        self.replay_memory = deque(maxlen=config['REPLAY_MEMORY_SIZE'])
+
         self.action_dim = env.action_space.n
         self.observation_dim = env.observation_space.shape
-        
-        # both q networks for online action choice and the target network
-        self.model = self.create_model()
-        self.targetmodel = self.create_model()
-        self.targetmodel.set_weights(self.model.get_weights())
-        
-        # counter for training steps used for updating the target network from time to time (defined in config)
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.model = DQNNetwork(self.observation_dim, self.action_dim).to(self.device)
+        self.targetmodel = DQNNetwork(self.observation_dim, self.action_dim).to(self.device)
+        self.targetmodel.load_state_dict(self.model.state_dict())
+        self.targetmodel.eval()
+
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learningRate)
+        self.loss_fn = nn.MSELoss()
+
         self.counterDQNTrained = 0
 
-        # information being stored after each episode
         self.reward_episodes = []
         self.epsilon_over_episodes = []
         self.timesteps_per_episode = []
         self.average_score_100_episodes = []
-    
-    def create_model(self):
-        ''' DQN definition, from 2 inputs to 2 hidden layers with 24, 48 nodes with relu activation function. 
-        Output layer has 3 nodes with a linear activation function '''
-        state_input = Input(shape=self.observation_dim)
-        state_h1 = Dense(24, activation='relu')(state_input)
-        state_h2 = Dense(48, activation='relu')(state_h1)
-        output = Dense(self.action_dim, activation='linear')(state_h2)
-        model = Model(inputs=state_input, outputs=output)
-        # loss function as Mean Squared Error with an adam optimizer with given learning rate
-        model.compile(optimizer=Adam(learning_rate=self.learningRate), loss='mse')
-        return model
 
     def load_model(self, name):
-        ''' loads a model, that is, the weights of the DQN function approximator '''
-        self.model.load_weights(name+".keras")
-        
+        """Load model weights from a .pth file."""
+        self.model.load_state_dict(torch.load(name + '.pth', map_location=self.device))
+        self.model.eval()
+
     def save_model(self, name):
-        ''' saves the weights of the DQN '''
-        self.model.save(name+".keras")
-    
+        """Save model weights to a .pth file."""
+        torch.save(self.model.state_dict(), name + '.pth')
+
     def memorize(self, state, action, reward, next_state, done):
-        # Store the transition into the replay-memory
         self.replay_memory.append((state, action, reward, next_state, done))
+
+    def _to_tensor(self, arr):
+        return torch.tensor(arr, dtype=torch.float32, device=self.device)
 
     def trainDQN(self):
         self.counterDQNTrained += 1
-        
-        # sample minibatch
-        batch = random.sample(self.replay_memory,self.miniBatchSize)
 
-        X_cur_states = []
-        X_next_states = []
-        
-        for index, sample in enumerate(batch):
-            cur_state, action, reward, next_state, done = sample
-            X_cur_states.append(cur_state)
-            X_next_states.append(next_state)
-        
-        X_cur_states = np.array(X_cur_states)
-        X_next_states = np.array(X_next_states)
-        
-        cur_action_values = self.model.predict(X_cur_states, verbose=0)
-        next_action_values = self.targetmodel.predict(X_next_states, verbose=0)
+        batch = random.sample(self.replay_memory, self.miniBatchSize)
+        cur_states, actions, rewards, next_states, dones = zip(*batch)
 
-        for index, sample in enumerate(batch):
-            cur_state, action, reward, next_state, done = sample
-            cur_action_values[index][action] = reward + (1-done) * self.discount * np.amax(next_action_values[index])
+        cur_states_t = self._to_tensor(np.array(cur_states))
+        next_states_t = self._to_tensor(np.array(next_states))
+        rewards_t = self._to_tensor(np.array(rewards))
+        dones_t = self._to_tensor(np.array(dones, dtype=np.float32))
+        actions_t = torch.tensor(actions, dtype=torch.long, device=self.device)
 
-        # Gradient update each sample
-        self.model.train_on_batch(X_cur_states, cur_action_values)
-        
-        # for each updateTQNW steps we adjust the DQN update the target network with the weights
+        # Current Q-values for taken actions
+        q_values = self.model(cur_states_t).gather(1, actions_t.unsqueeze(1)).squeeze(1)
+
+        # Target Q-values from frozen target network
+        with torch.no_grad():
+            next_q = self.targetmodel(next_states_t).max(1).values
+            targets = rewards_t + (1 - dones_t) * self.discount * next_q
+
+        loss = self.loss_fn(q_values, targets)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
         if self.counterDQNTrained % self.updateTQNW == 0:
-            self.targetmodel.set_weights(self.model.get_weights())
+            self.targetmodel.load_state_dict(self.model.state_dict())
+
+    def _predict_action(self, state):
+        """Greedy action selection (no gradient tracking needed)."""
+        with torch.no_grad():
+            q = self.model(self._to_tensor(state).unsqueeze(0))
+        return int(q.argmax(dim=1).item())
 
     def train(self, env):
-        ''' the actual training of the agent '''
-        logdir = self.logs 
-
-        # for data gathering
+        """Train the agent for the configured number of episodes."""
+        logdir = self.logs
         max_reward = -999999
         scores_deque = deque(maxlen=100)
 
         for episode in range(self.episodes):
-            cur_state,_ = env.reset()
+            cur_state, _ = env.reset()
             done = False
             episode_reward = 0
             episode_length = 0
 
             while not done:
                 episode_length += 1
-                # set VISUALIZATION = True if want to see agent while training. But makes training a bit slower. 
-                # Default is showing the agent after each 50 episodes
                 if self.visualization:
                     env.render()
 
-                if(np.random.uniform(0, 1) < self.epsilon):
-                    # Take random action
+                if np.random.uniform(0, 1) < self.epsilon:
                     action = np.random.randint(0, self.action_dim)
                 else:
-                    # Take action that maximizes the total reward (same for DDQN)
-                    action = np.argmax(self.model.predict(np.expand_dims(cur_state, axis=0), verbose=0)[0])
+                    action = self._predict_action(cur_state)
 
                 next_state, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
-
                 episode_reward += reward
 
                 if done:
-                    if (episode_reward > max_reward):
-                        self.save_model(logdir+'/'+str(episode_reward)+"_agent")
-                    elif (episode % 50 == 0):
-                        self.save_model(logdir+"/Episode_"+str(episode)+"_agent")
-                        print('Episode:\t', episode, '\t Average Score:\t',np.mean(scores_deque))
-                
-                # Add experience to replay memory buffer
+                    if episode_reward > max_reward:
+                        self.save_model(logdir + '/' + str(episode_reward) + '_agent')
+                    elif episode % 50 == 0:
+                        self.save_model(logdir + '/Episode_' + str(episode) + '_agent')
+                        print('Episode:\t', episode, '\t Average Score:\t', np.mean(scores_deque))
+
                 self.memorize(cur_state, action, reward, next_state, done)
                 cur_state = next_state
-                
-                # only train DQN if there are enough transitions stored
-                if(len(self.replay_memory) < self.minReplayMem):
+
+                if len(self.replay_memory) < self.minReplayMem:
                     continue
 
                 if episode_length % self.trainFrequency == 0:
                     self.trainDQN()
 
-            print('episode: {}, reward: {}'.format(episode+1,episode_reward))
+            print('episode: {}, reward: {}'.format(episode + 1, episode_reward))
 
-            # Decrease epsilon
-            if(self.epsilon > self.minEps and len(self.replay_memory) > self.minReplayMem):
+            if self.epsilon > self.minEps and len(self.replay_memory) > self.minReplayMem:
                 self.epsilon *= self.epsDecay
 
-            # some bookkeeping.
             scores_deque.append(episode_reward)
             max_reward = max(episode_reward, max_reward)
-            
-            # saving the important scalars
+
             self.reward_episodes.append(episode_reward)
             self.epsilon_over_episodes.append(self.epsilon)
             self.timesteps_per_episode.append(episode_length)
             self.average_score_100_episodes.append(np.mean(scores_deque))
-        
-        # Save all the information during training in a pandas dataframe and save it as a csv file
+
         self.save_data(logdir, 'results.csv')
 
-    def save_data(self, logdir, name, 
-                  col_reward = 'Rewards', 
-                  col_epsilon = 'Epsilon over episodes', 
-                  col_timesteps = 'Timesteps per episode',
-                  col_average_score = 'Average score over 100 episodes'):
-        
-        df = pd.DataFrame({col_reward: self.reward_episodes, 
+    def save_data(self, logdir, name,
+                  col_reward='Rewards',
+                  col_epsilon='Epsilon over episodes',
+                  col_timesteps='Timesteps per episode',
+                  col_average_score='Average score over 100 episodes'):
+
+        df = pd.DataFrame({col_reward: self.reward_episodes,
                            col_epsilon: self.epsilon_over_episodes,
                            col_timesteps: self.timesteps_per_episode,
                            col_average_score: self.average_score_100_episodes})
-
         df.to_csv(logdir + '/' + name)
 
-    def test(self, env, name, TOTAL_EPISODES  = 10):
-        ''' load the weights of the DQN and perform 10 steps in the environment '''
-        # create and load weights of the model
+    def test(self, env, name, TOTAL_EPISODES=10):
+        """Load model weights and run evaluation episodes."""
         self.load_model(name)
-
-        # Number of episodes in which agent manages to won the game before time is over
         episodes_won = 0
 
         for _ in range(TOTAL_EPISODES):
             episode_reward = 0
-            cur_state,_ = env.reset()
+            cur_state, _ = env.reset()
             done = False
             episode_len = 0
+
             while not done:
                 env.render()
                 episode_len += 1
-                next_state, reward, terminated, truncated ,_ = env.step(np.argmax(self.model.predict(np.expand_dims(cur_state, axis=0), verbose=0)))
+                action = self._predict_action(cur_state)
+                next_state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 if done and episode_len > 475:
                     episodes_won += 1
                 cur_state = next_state
                 episode_reward += reward
-            print('EPISODE_REWARD', episode_reward)
-            
-        print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
 
+            print('EPISODE_REWARD', episode_reward)
+
+        print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
