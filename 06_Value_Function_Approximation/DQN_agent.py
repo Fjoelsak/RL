@@ -202,7 +202,8 @@ class DQNAgent:
                 if episode_length % self.trainFrequency == 0:
                     self.trainDQN()
 
-            print('episode: {}, reward: {}'.format(episode + 1, episode_reward))
+            if episode % 10 == 0:
+                print(f"Episode {episode}, Reward: {episode_reward:.2f}, Average(100): {np.mean(scores_deque):.2f}")
 
             if self.epsilon > self.minEps and len(self.replay_memory) > self.minReplayMem:
                 self.epsilon *= self.epsDecay
@@ -346,5 +347,5 @@ class NaiveDQNAgent:
             self.timesteps_per_episode.append(episode_length)
             self.average_score_100_episodes.append(np.mean(scores_deque))
 
-            if episode % 50 == 0:
+            if episode % 10 == 0:
                 print(f"Episode {episode}, Reward: {episode_reward:.2f}, Average(100): {np.mean(scores_deque):.2f}")
