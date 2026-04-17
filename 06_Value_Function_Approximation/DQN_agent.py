@@ -51,18 +51,18 @@ class ReplayBuffer:
 
 
 class DQNNetwork(nn.Module):
-    """DQN: two hidden layers (24, 48, ReLU), linear output over action_dim."""
+    """Fully-connected Q-network with configurable hidden layers."""
 
-    def __init__(self, observation_dim, action_dim):
+    def __init__(self, observation_dim, action_dim, hidden_dims=(24, 48)):
         super().__init__()
         input_size = int(np.prod(observation_dim))
-        self.net = nn.Sequential(
-            nn.Linear(input_size, 24),
-            nn.ReLU(),
-            nn.Linear(24, 48),
-            nn.ReLU(),
-            nn.Linear(48, action_dim),
-        )
+        layers = []
+        prev = input_size
+        for h in hidden_dims:
+            layers += [nn.Linear(prev, h), nn.ReLU()]
+            prev = h
+        layers.append(nn.Linear(prev, action_dim))
+        self.net = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.net(x)
@@ -91,9 +91,10 @@ class DQNAgent:
         self.replay_memory = ReplayBuffer(config['REPLAY_MEMORY_SIZE'], self.observation_dim)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        hidden_dims = config.get('HIDDEN_DIMS', (24, 48))
 
-        self.model = DQNNetwork(self.observation_dim, self.action_dim).to(self.device)
-        self.targetmodel = DQNNetwork(self.observation_dim, self.action_dim).to(self.device)
+        self.model = DQNNetwork(self.observation_dim, self.action_dim, hidden_dims).to(self.device)
+        self.targetmodel = DQNNetwork(self.observation_dim, self.action_dim, hidden_dims).to(self.device)
         self.targetmodel.load_state_dict(self.model.state_dict())
         self.targetmodel.eval()
 
@@ -278,7 +279,8 @@ class NaiveDQNAgent:
         self.obs_dim    = env.observation_space.shape
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model  = DQNNetwork(self.obs_dim, self.action_dim).to(self.device)
+        hidden_dims = config.get('HIDDEN_DIMS', (24, 48))
+        self.model  = DQNNetwork(self.obs_dim, self.action_dim, hidden_dims).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learningRate)
         self.loss_fn   = nn.MSELoss()
 
