@@ -254,3 +254,97 @@ class DQNAgent:
             print('EPISODE_REWARD', episode_reward)
 
         print(episodes_won, 'EPISODES WON AMONG', TOTAL_EPISODES, 'EPISODES')
+
+
+class NaiveDQNAgent:
+    """DQN without experience replay and without a target network.
+
+    Each transition triggers an immediate online update using the main
+    network for both action selection and bootstrap targets. Intended as
+    an ablation baseline to demonstrate why both components are necessary.
+    """
+
+    def __init__(self, env, config):
+        self.episodes     = config['EPISODES']
+        self.epsilon      = config['EPSILON']
+        self.epsDecay     = config['EPSILON_DECAY']
+        self.minEps       = config['MINIMUM_EPSILON']
+        self.discount     = config['DISCOUNT']
+        self.learningRate = config['LEARNING_RATE']
+        self.logs         = config['LOGS']
+
+        self.action_dim = env.action_space.n
+        self.obs_dim    = env.observation_space.shape
+
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model  = DQNNetwork(self.obs_dim, self.action_dim).to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learningRate)
+        self.loss_fn   = nn.MSELoss()
+
+        self.reward_episodes            = []
+        self.epsilon_over_episodes      = []
+        self.timesteps_per_episode      = []
+        self.average_score_100_episodes = []
+
+    def _to_tensor(self, arr):
+        return torch.from_numpy(np.ascontiguousarray(arr, dtype=np.float32)).to(self.device)
+
+    def _predict_action(self, state):
+        self.model.eval()
+        with torch.no_grad():
+            q = self.model(self._to_tensor(state).unsqueeze(0))
+        return int(q.argmax(dim=1).item())
+
+    def _train_step(self, state, action, reward, next_state, done):
+        """Online update on a single transition."""
+        s  = self._to_tensor(state).unsqueeze(0)
+        ns = self._to_tensor(next_state).unsqueeze(0)
+
+        self.model.train()
+        q_val = self.model(s)[0, action]
+
+        with torch.no_grad():
+            next_q = self.model(ns).max(1).values[0]
+        target = reward + (1 - float(done)) * self.discount * next_q
+
+        loss = self.loss_fn(q_val, target)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+    def train(self, env):
+        """Train the naive agent for the configured number of episodes."""
+        os.makedirs(self.logs, exist_ok=True)
+        scores_deque = deque(maxlen=100)
+
+        for episode in range(self.episodes):
+            state, _ = env.reset()
+            done           = False
+            episode_reward = 0
+            episode_length = 0
+
+            while not done:
+                episode_length += 1
+                if np.random.uniform(0, 1) < self.epsilon:
+                    action = np.random.randint(0, self.action_dim)
+                else:
+                    action = self._predict_action(state)
+
+                next_state, reward, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
+                episode_reward += reward
+
+                self._train_step(state, action, reward, next_state, done)
+                state = next_state
+
+            if self.epsilon > self.minEps:
+                self.epsilon *= self.epsDecay
+
+            scores_deque.append(episode_reward)
+            self.reward_episodes.append(episode_reward)
+            self.epsilon_over_episodes.append(self.epsilon)
+            self.timesteps_per_episode.append(episode_length)
+            self.average_score_100_episodes.append(np.mean(scores_deque))
+
+            if episode % 50 == 0:
+                print(f"Episode {episode}, Reward: {episode_reward:.2f}, Average(100): {np.mean(scores_deque):.2f}")
