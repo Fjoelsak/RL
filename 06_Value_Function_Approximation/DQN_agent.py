@@ -188,7 +188,7 @@ class DQNAgent:
                 episode_reward += reward
 
                 if done:
-                    if episode_reward > max_reward:
+                    if episode_reward >= max_reward:
                         self.save_model(logdir + '/best_agent')
 
                 self.memorize(cur_state, action, reward, next_state, done)
