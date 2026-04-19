@@ -189,10 +189,7 @@ class DQNAgent:
 
                 if done:
                     if episode_reward > max_reward:
-                        self.save_model(logdir + '/' + str(episode_reward) + '_agent')
-                    elif episode % 50 == 0:
-                        self.save_model(logdir + '/Episode_' + str(episode) + '_agent')
-                        print('Episode:\t', episode, '\t Average Score:\t', np.mean(scores_deque))
+                        self.save_model(logdir + '/best_agent')
 
                 self.memorize(cur_state, action, reward, next_state, done)
                 cur_state = next_state
