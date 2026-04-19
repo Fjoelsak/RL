@@ -206,6 +206,7 @@ class DQNAgent:
             if episode % 10 == 0:
                 print(f"Episode {episode}, Reward: {episode_reward:.2f}, Average(100): {np.mean(scores_deque):.2f}")
 
+
             if self.epsilon > self.minEps and len(self.replay_memory) > self.minReplayMem:
                 self.epsilon *= self.epsDecay
 
@@ -351,3 +352,16 @@ class NaiveDQNAgent:
 
             if episode % 10 == 0:
                 print(f"Episode {episode}, Reward: {episode_reward:.2f}, Average(100): {np.mean(scores_deque):.2f}")
+
+        self.save_data(self.logs, 'results.csv')
+
+    def save_data(self, logdir, name,
+                  col_reward='Rewards',
+                  col_epsilon='Epsilon over episodes',
+                  col_timesteps='Timesteps per episode',
+                  col_average_score='Average score over 100 episodes'):
+        df = pd.DataFrame({col_reward: self.reward_episodes,
+                           col_epsilon: self.epsilon_over_episodes,
+                           col_timesteps: self.timesteps_per_episode,
+                           col_average_score: self.average_score_100_episodes})
+        df.to_csv(logdir + '/' + name)
