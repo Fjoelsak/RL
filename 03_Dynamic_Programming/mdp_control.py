@@ -58,17 +58,14 @@ class mdpControl:
         """
         Performs policy iteration by evaluating and improving the policy until it converges.
 
-        Parameters:
-        ----------
-        gamma : float, optional
-            Discount factor, by default 0.99.
-
         Returns:
         -------
         policy : np.array of shape [nS, nA]
             The optimal policy found after iteration.
         V : np.array of shape [nS]
             The value function of the optimal policy.
+        n_iter : int
+            Number of policy evaluation/improvement iterations until convergence.
         """
 
         ### TODO: your code here ###
@@ -84,6 +81,8 @@ class mdpControl:
             The optimal policy derived from the value function.
         V : np.array of shape [nS]
             The optimal value function.
+        n_iter : int
+            Number of sweeps over all states until convergence.
         """
         V = np.zeros(self.nS)
         pass
