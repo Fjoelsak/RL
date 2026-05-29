@@ -19,6 +19,7 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 
 ## 04-Model-free prediction
 - 40-Blackjack-Eval.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/40-Blackjack_Eval.ipynb)
+- 41-Blackjack-TD.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/04_Model_free_prediction/41-Blackjack_TD.ipynb)
 
 ## 05-Model-free control
 - 50-Blackjack-MC-Control.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/05_Model_free_control/50-Blackjack_MC_Control.ipynb)
