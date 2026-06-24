@@ -110,7 +110,14 @@ class DQNAgent:
 
     def load_model(self, name):
         """Load model weights from a .pth file."""
-        self.model.load_state_dict(torch.load(name + '.pth', map_location=self.device))
+        path = name + '.pth'
+        if not os.path.isfile(path):
+            raise FileNotFoundError(
+                f"No model file found at '{path}'. Check the path/filename "
+                f"(weights are saved as '<logdir>/best_agent.pth') and make sure "
+                f"the agent has been trained before testing."
+            )
+        self.model.load_state_dict(torch.load(path, map_location=self.device))
         self.model.eval()
 
     def save_model(self, name):
