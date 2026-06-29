@@ -7,6 +7,7 @@ def plot_trainingsinformation(data,
                               colors,
                               figsize=(15, 4),
                               ylim=3000,
+                              ylim_low=0,
                               columns=['Rewards', 'Timesteps per episode', 'Average score over 100 episodes'],
                               smoothing_factor=0.05,
                               alpha_non_smooth=0.3):
@@ -25,6 +26,10 @@ def plot_trainingsinformation(data,
         Size of the entire plot figure.
     ylim : int or float, optional (default=3000)
         Upper limit for the y-axis in the rewards plot.
+    ylim_low : int or float, optional (default=0)
+        Lower limit for the y-axis in the rewards plot. Use 0 for environments
+        with non-negative rewards (e.g. CartPole) and a negative value for
+        environments with negative rewards (e.g. Pendulum).
     columns : list of str, optional
         Names of the columns to be plotted from the DataFrames.
     smoothing_factor : float, optional (default=0.05)
@@ -60,4 +65,4 @@ def plot_trainingsinformation(data,
         else:
             ax[1].legend(loc=9, bbox_to_anchor=(0.5, 1.15), ncols=len(columns))
 
-    ax[0].set_ylim(-1600, ylim)
+    ax[0].set_ylim(ylim_low, ylim)
