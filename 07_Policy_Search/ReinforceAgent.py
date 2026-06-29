@@ -203,15 +203,12 @@ class ReinforceAgent:
             self._update_policy(episode)
             all_rewards.append(total_reward)
 
+            # Save the best agent so far, otherwise a periodic checkpoint.
             if done:
                 if total_reward > max_reward:
                     self.save_model(self.logs + '/' + str(total_reward) + '_agent')
                 elif episode % 50 == 0:
                     self.save_model(self.logs + '/Episode_' + str(episode) + '_agent')
-                    print('Episode:\t', episode, '\t Average Score:\t', np.mean(scores_deque))
-
-            if episode % 50 == 0:
-                print(f"Episode {episode}, Reward: {total_reward:.2f}")
 
             scores_deque.append(total_reward)
             max_reward = max(total_reward, max_reward)
@@ -219,6 +216,11 @@ class ReinforceAgent:
             self.reward_episodes.append(total_reward)
             self.timesteps_per_episode.append(timestep_per_episode)
             self.average_score_100_episodes.append(np.mean(scores_deque))
+
+            # Single progress line with both reward and running average score.
+            if episode % 50 == 0:
+                print(f"Episode {episode}\tReward: {total_reward:.2f}\t"
+                      f"Average Score: {np.mean(scores_deque):.2f}")
 
         self.save_data(self.logs, 'results.csv')
 
