@@ -22,11 +22,14 @@ class PolicyNetwork(nn.Module):
 
     def __init__(self, input_dim, hidden_dim, output_dim):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, output_dim),
-        )
+        # TODO (Task 3a): Build a simple feed-forward policy network with ONE hidden layer.
+        #   - input_dim  -> hidden_dim  (Linear)
+        #   - ReLU activation
+        #   - hidden_dim -> output_dim  (Linear)
+        # Output raw logits (NO softmax here); Categorical(logits=...) handles the
+        # normalization later in a numerically stable way.
+        # Replace the line below with your nn.Sequential(...).
+        self.net = None
 
     def forward(self, x):
         return self.net(x)
@@ -68,7 +71,22 @@ class ReinforceAgent:
         self.average_score_100_episodes = []
 
     def get_action(self, state):
-        """Sample an action from the policy. Returns (action, probability)."""
+        """Sample an action from the current stochastic policy.
+
+        The network output is treated as categorical logits; an action is drawn
+        from that distribution (so exploration is built into the policy itself,
+        no epsilon-greedy needed).
+
+        Parameters
+        ----------
+        state : array-like
+            The current environment observation.
+
+        Returns
+        -------
+        tuple(int, float)
+            The sampled action and the probability the policy assigned to it.
+        """
         state_t = torch.from_numpy(np.ascontiguousarray(state, dtype=np.float32)).unsqueeze(0).to(self.device)
         self.policy_net.eval()
         with torch.no_grad():
@@ -78,12 +96,28 @@ class ReinforceAgent:
         return action, dist.probs[action].item()
 
     def store_transition(self, state, action, reward):
+        """Append one (state, action, reward) tuple to the current episode buffer.
+
+        The buffers are consumed by :meth:`_update_policy` at the end of the
+        episode and cleared afterwards.
+        """
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
 
     def _compute_discounted_rewards(self):
-        """Compute normalized discounted returns for the stored episode."""
+        """Compute the normalized discounted returns G_t for the stored episode.
+
+        Walks the reward list backwards to accumulate
+        ``G_t = r_t + gamma * G_{t+1}``, then standardizes the returns
+        (zero mean, unit variance) as a simple baseline that reduces the
+        variance of the policy gradient.
+
+        Returns
+        -------
+        np.ndarray
+            One normalized return per timestep of the episode.
+        """
         discounted = np.zeros(len(self.rewards), dtype=np.float32)
         cumulative = 0.0
         for t in reversed(range(len(self.rewards))):
@@ -93,7 +127,18 @@ class ReinforceAgent:
         return discounted
 
     def _update_policy(self, episode: int):
-        """Apply one REINFORCE gradient update and clear episode storage."""
+        """Apply one REINFORCE gradient update from the finished episode.
+
+        Recomputes the action logits for all visited states in a single batch,
+        forms the policy-gradient loss from the log-probabilities weighted by the
+        discounted returns, takes one optimizer step, and clears the episode
+        buffers.
+
+        Parameters
+        ----------
+        episode : int
+            Index of the current episode (kept for logging/extension hooks).
+        """
         discounted_rewards = self._compute_discounted_rewards()
 
         states_t  = torch.from_numpy(np.array(self.states, dtype=np.float32)).to(self.device)
@@ -105,6 +150,11 @@ class ReinforceAgent:
         # Categorical(logits=...) applies log_softmax internally — numerically stable
         dist = Categorical(logits=logits)
         log_probs = dist.log_prob(actions_t)
+        # TODO (Task 3b): Define the REINFORCE loss.
+        # The policy-gradient objective maximizes  sum_t log pi(a_t | s_t) * G_t,
+        # where G_t are the (normalized) discounted returns in `returns_t`.
+        # Optimizers minimize, so the loss is the NEGATIVE of that objective:
+        #     loss = -sum_t log_probs_t * returns_t
         loss = -(log_probs * returns_t).sum()
 
         self.optimizer.zero_grad()
@@ -114,7 +164,18 @@ class ReinforceAgent:
         self.states, self.actions, self.rewards = [], [], []
 
     def train(self, env: Env):
-        """Train the policy network over the configured number of episodes."""
+        """Train the policy network over the configured number of episodes.
+
+        For each episode the agent rolls out a full trajectory under the current
+        policy, stores every transition, and then performs one Monte-Carlo policy
+        gradient update. Best-so-far and periodic checkpoints are saved to
+        ``LOGS``, and per-episode metrics are written to ``results.csv`` at the end.
+
+        Parameters
+        ----------
+        env : gymnasium.Env
+            The environment to train on (must follow the Gymnasium API).
+        """
         os.makedirs(self.logs, exist_ok=True)
         all_rewards = []
         max_reward = -999999
@@ -174,14 +235,24 @@ class ReinforceAgent:
                   col_reward='Rewards',
                   col_timesteps='Timesteps per episode',
                   col_average_score='Average score over 100 episodes'):
+        """Write the per-episode training metrics to ``<logdir>/<name>`` as CSV.
+
+        Stores reward, episode length and the 100-episode moving average so the
+        run can be reloaded and plotted with :func:`plot_trainingsinformation`.
+        """
         df = pd.DataFrame({col_reward: self.reward_episodes,
                            col_timesteps: self.timesteps_per_episode,
                            col_average_score: self.average_score_100_episodes})
         df.to_csv(logdir + '/' + name)
 
-    def test(self, env, name, TOTAL_EPISODES=10):
-        """Load weights and run evaluation episodes."""
-        self.load_model(name)
+    def test(self, env, name=None, TOTAL_EPISODES=10):
+        """Run evaluation episodes.
+
+        If ``name`` is given, the corresponding weights are loaded first;
+        otherwise the agent's current (e.g. just-trained) weights are used.
+        """
+        if name is not None:
+            self.load_model(name)
         episodes_won = 0
 
         for _ in range(TOTAL_EPISODES):
