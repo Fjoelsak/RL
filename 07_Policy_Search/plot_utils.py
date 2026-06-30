@@ -43,16 +43,25 @@ def plot_trainingsinformation(data,
     None
         Displays the plot with training metrics.
     """
-    fig, ax = plt.subplots(figsize=figsize, ncols=len(columns), nrows=1)
+    fig, ax = plt.subplots(figsize=figsize, ncols=len(columns), nrows=1, squeeze=False)
+    # squeeze=False keeps ax a 2D array even for a single column; flatten to 1D
+    # so a single-column plot (e.g. comparing only the average score) still works.
+    ax = ax.ravel()
 
     for i, col in enumerate(columns):
-        # Last column is plotted at full opacity without smoothing
-        alpha = alpha_non_smooth if i != len(columns) - 1 else 1
+        # The last column is plotted at full opacity without extra smoothing
+        # (its raw curve is already the smoothed 100-episode average).
+        is_last = (i == len(columns) - 1)
+        alpha = 1 if is_last else alpha_non_smooth
 
         for k, df in enumerate(data):
-            sns.lineplot(df, x=df.index, y=col, alpha=alpha, color=colors[k], ax=ax[i])
+            # Give the raw line a label only on the last column (or when it is
+            # the only column); otherwise the smoothed line below carries it.
+            label = data_names[k] if is_last else None
+            sns.lineplot(df, x=df.index, y=col, alpha=alpha, color=colors[k],
+                         label=label, ax=ax[i])
 
-        if i != len(columns) - 1:
+        if not is_last:
             for k, df in enumerate(data):
                 sns.lineplot(df.ewm(alpha=smoothing_factor).mean(), x=df.index, y=col,
                              label=data_names[k], color=colors[k], ax=ax[i])
@@ -60,9 +69,11 @@ def plot_trainingsinformation(data,
         ax[i].grid(alpha=0.3)
         ax[i].set_xlabel('Episodes')
 
-        if i == 0:
-            ax[i].get_legend().remove()
-        else:
-            ax[1].legend(loc=9, bbox_to_anchor=(0.5, 1.15), ncols=len(columns))
+        # Keep the legend only on the last axis; remove it from the others.
+        legend = ax[i].get_legend()
+        if not is_last and legend is not None:
+            legend.remove()
+
+    ax[-1].legend(loc=9, bbox_to_anchor=(0.5, 1.15), ncols=len(data))
 
     ax[0].set_ylim(ylim_low, ylim)
