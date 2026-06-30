@@ -337,6 +337,7 @@ class A2CAgent:
                 break
 
         self.save_data(self.logs, 'results.csv')
+        self.save_diagnostics(self.logs, 'diagnostics.csv')
 
     def get_diagnostics(self):
         """Return per-update training diagnostics as a DataFrame.
@@ -354,6 +355,25 @@ class A2CAgent:
             'ActorLoss': self.diag_actor_loss,
             'ValueLoss': self.diag_value_loss,
         })
+
+    def save_diagnostics(self, logdir, name='diagnostics.csv'):
+        """Persist the per-update diagnostics to ``<logdir>/<name>`` as CSV.
+
+        Written at the end of :meth:`train` alongside ``results.csv`` so the
+        warning-sign curves (entropy / std / approx-KL collapse) survive a
+        kernel restart and can be reloaded with :meth:`load_diagnostics`.
+        """
+        os.makedirs(logdir, exist_ok=True)
+        self.get_diagnostics().to_csv(logdir + '/' + name, index=False)
+
+    @staticmethod
+    def load_diagnostics(logdir, name='diagnostics.csv'):
+        """Load a previously saved ``diagnostics.csv`` back into a DataFrame.
+
+        Lets you re-plot the diagnostics of a finished run without retraining
+        (and without keeping the agent in memory).
+        """
+        return pd.read_csv(logdir + '/' + name)
 
     def save_model(self, name):
         torch.save(self.net.state_dict(), name + '.pth')
