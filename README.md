@@ -38,5 +38,9 @@ Here are the jupyter notebooks of the chapters available in colab for direct use
 - 80-KL-Divergence.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/08_Advanced_Policy_Search/80-KL-Divergence.ipynb)
 - 81-CartPole-PPO.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/08_Advanced_Policy_Search/81-CartPole-PPO.ipynb)
 
+## 09-Off-policy actor-critic
+- 90-Pendulum-DDPG.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/09_Off_policy_Actor_Critic/90-Pendulum-DDPG.ipynb)
+- 91-Pendulum-SAC.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/09_Off_policy_Actor_Critic/91-Pendulum-SAC.ipynb)
+
 ## CESI International Week Workshop on RL
 - 99-Taxi-Control.ipynb [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Fjoelsak/RL/blob/main/99_International_Week_Workshop_RL/99-Taxi-Control.ipynb)
